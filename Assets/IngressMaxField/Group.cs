@@ -3,8 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JetBrains.Annotations;
 using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
+using Sirenix.Utilities.Editor;
 using UnityEditor;
 using UnityEngine;
 
@@ -92,8 +94,17 @@ namespace IngressMaxField
         [TextArea(10, 10)]
         public string sequence;
 
-        [TextArea(10, 10)]
-        public string steps;
+        [ListDrawerSettings(ListElementLabelName = "RenderLink", OnTitleBarGUI = "Copy")]
+        public Link[] steps;
+
+        [UsedImplicitly]
+        private void Copy()
+        {
+            if (SirenixEditorGUI.ToolbarButton(EditorIcons.File))
+            {
+                Clipboard.Copy(string.Join("\n", from e in steps select e.RenderLink));
+            }
+        }
 
         [TextArea(10, 10)]
         public string requirements;
@@ -131,10 +142,11 @@ namespace IngressMaxField
         [Button]
         public void PlanWithSort()
         {
+            Portal.SetRefPos(portals.First());
             portals = Sort();
 
             var targetPortal = AllPortals[target];
-            var detailedSteps = new List<string>();
+            var detailedSteps = new List<Link>();
             var previousPortals = new List<Portal>();
             var existingLinks = new List<Link>();
             var requiredKeys = new Dictionary<Portal, int>();
@@ -149,10 +161,11 @@ namespace IngressMaxField
 
             void EstablishLink(Portal from, Portal to, bool add = true)
             {
-                detailedSteps.Add($"Link {from.name} -> {to.name}");
+                var newLink = new Link(from, to);
+                detailedSteps.Add(newLink);
                 if (add)
                 {
-                    existingLinks.Add(new Link(from, to));
+                    existingLinks.Add(newLink);
                 }
 
                 requiredKeys[to] = requiredKeys.ContainsKey(to) ? requiredKeys[to] + 1 : 1;
@@ -178,97 +191,12 @@ namespace IngressMaxField
                 previousPortals.Add(curr);
             }
 
-            steps = string.Join("\n", detailedSteps);
+            steps = detailedSteps.ToArray();
 
             var listRequirements = new List<string>();
             foreach (var kv in outBounds)
             {
                 if (kv.Value >= 8)
-                {
-                    listRequirements.Add($"{kv.Key.name} needs SBUL");
-                }
-            }
-
-            foreach (var portalLink in portals)
-            {
-                var portal = AllPortals[portalLink];
-                if (requiredKeys.TryGetValue(portal, out var count))
-                {
-                    listRequirements.Add($"Keys for {portal.name} is {count}");
-                }
-                else
-                {
-                    listRequirements.Add($"Keys for {portal.name} is !!!ZERO!!!");
-                }
-            }
-
-            requirements = string.Join("\n", listRequirements);
-        }
-
-        [Button]
-        public void PlanWithFixedSequence()
-        {
-            var sorted = Sort();
-
-            var targetPortal = AllPortals[target];
-            var detailedSteps = new List<string>();
-            var previousPortals = new List<Portal>();
-            var existingLinks = new List<Link>();
-            var requiredKeys = new Dictionary<Portal, int>();
-            var outBounds = new Dictionary<Portal, HashSet<string>>();
-
-            // add star links first
-            for (var i = 1; i < portals.Length; i++)
-            {
-                var curr = AllPortals[portals[i]];
-                existingLinks.Add(new Link(curr, targetPortal));
-            }
-
-            var resolve = 0;
-
-            void EstablishLink(Portal from, Portal to, bool add = true)
-            {
-                detailedSteps.Add($"Link {from.name} -> {to.name}");
-                if (add)
-                {
-                    existingLinks.Add(new Link(from, to));
-                }
-
-                requiredKeys[to] = requiredKeys.ContainsKey(to) ? requiredKeys[to] + 1 : 1;
-                if (!outBounds.ContainsKey(from))
-                {
-                    outBounds.Add(from, new HashSet<string>());
-                }
-
-                outBounds[from].Add(to.link);
-            }
-
-            for (var i = 1; i < portals.Length; i++)
-            {
-                var curr = AllPortals[portals[i]];
-                resolve = curr.Sequence;
-                // create link to target
-                EstablishLink(curr, targetPortal, false);
-                // try link to previous portals
-                foreach (var previousPortal in previousPortals)
-                {
-                    var pendingLink = new Link(curr, previousPortal);
-                    if (pendingLink.CanLink(existingLinks))
-                    {
-                        EstablishLink(curr, previousPortal);
-                    }
-                }
-
-                // add self to previous portals
-                previousPortals.Add(curr);
-            }
-
-            steps = string.Join("\n", detailedSteps);
-
-            var listRequirements = new List<string>();
-            foreach (var kv in outBounds)
-            {
-                if (kv.Value.Count >= 8)
                 {
                     listRequirements.Add($"{kv.Key.name} needs SBUL");
                 }

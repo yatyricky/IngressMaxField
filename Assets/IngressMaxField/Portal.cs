@@ -10,6 +10,8 @@ namespace IngressMaxField
         private static readonly Regex RegexCoordinates = new Regex(@"https://intel\.ingress\.com/intel\?ll=(?<x>[\d\.\-]+),(?<y>[\d\.\-]+)&z=\d+&pll=([\d\.\-]+),([\d\.\-]+)", RegexOptions.Compiled);
         public const double Scale = 100;
 
+        public static (double x, double y)? RefPos;
+
         public string name;
         public string link;
 
@@ -25,30 +27,40 @@ namespace IngressMaxField
         {
             get
             {
+                if (RefPos == null)
+                {
+                    return Vector3.zero;
+                }
+
                 if (_position == null)
                 {
-                    var match = RegexCoordinates.Match(link);
-                    if (match.Success)
-                    {
-                        var x = (float)(Frac(double.Parse(match.Groups["x"].Value)) * Scale);
-                        var y = (float)(Frac(double.Parse(match.Groups["y"].Value)) * Scale);
-                        var gps = new Vector3(x, 0f, y);
-                        _position = Quaternion.AngleAxis(180, new Vector3(1, 0, 1)) * gps;
-                    }
-                    else
-                    {
-                        Debug.LogError("fail");
-                        _position = Vector3.zero;
-                    }
+                    var ll = ExtractCoordinates(link);
+                    var x = (float)((ll.x - RefPos.Value.x) * Scale);
+                    var y = (float)((ll.y - RefPos.Value.y) * Scale);
+                    var gps = new Vector3(x, 0f, y);
+                    _position = Quaternion.AngleAxis(180, new Vector3(1, 0, 1)) * gps;
                 }
 
                 return _position.Value;
             }
         }
 
-        private static double Frac(double number)
+        private static (double x, double y) ExtractCoordinates(string link)
         {
-            return number - Math.Truncate(number);
+            var match = RegexCoordinates.Match(link);
+            if (!match.Success)
+            {
+                throw new Exception($"Not a valid ingress link {link}");
+            }
+
+            var x = double.Parse(match.Groups["x"].Value);
+            var y = double.Parse(match.Groups["y"].Value);
+            return new ValueTuple<double, double>(x, y);
+        }
+
+        public static void SetRefPos(string link)
+        {
+            RefPos = ExtractCoordinates(link);
         }
 
         public Portal(string link, string name)
@@ -59,7 +71,7 @@ namespace IngressMaxField
 
         public override string ToString()
         {
-            return name;
+            return $"[{Sequence}]{name}";
         }
     }
 }
