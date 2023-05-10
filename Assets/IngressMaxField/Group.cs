@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using JetBrains.Annotations;
 using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
@@ -46,7 +47,7 @@ namespace IngressMaxField
 
         private static IEnumerable<Portal> ParsePortals(IEnumerable<string> lines)
         {
-            return from line in lines where !string.IsNullOrEmpty(line) select line.Trim().Split(';') into tokens let link = tokens[0].Trim() let portalName = tokens[1].Trim() select new Portal(link, portalName);
+            return from line in lines where !string.IsNullOrEmpty(line) select line.Trim().Split(';') into tokens let portalName = tokens[0].Trim() let link = tokens[1].Trim() select new Portal(link, portalName);
         }
 
         [TextArea(10, 10)]
@@ -68,7 +69,7 @@ namespace IngressMaxField
             list.Sort((a, b) => string.Compare(a.link, b.link, StringComparison.Ordinal));
 
             var fp = Path.Combine(Application.persistentDataPath, "intel.txt");
-            File.WriteAllLines(fp, from e in list select $"{e.link};{e.name}");
+            File.WriteAllLines(fp, from e in list select $"{e.name};{e.link}");
         }
 
         [ValueDropdown("SelectPortal", IsUniqueList = true)]
@@ -91,23 +92,50 @@ namespace IngressMaxField
         [ValueDropdown("SelectPortal")]
         public string first;
 
-        [TextArea(10, 10)]
-        public string sequence;
-
         [ListDrawerSettings(ListElementLabelName = "RenderLink", OnTitleBarGUI = "Copy")]
         public Link[] steps;
+
+        private static void DictAdd<TKey>(IDictionary<TKey, int> dict, TKey key, int value)
+        {
+            if (dict.TryGetValue(key, out var count))
+            {
+                dict[key] = count + value;
+            }
+            else
+            {
+                dict.Add(key, value);
+            }
+        }
+
+        private static TValue DictGet<TKey, TValue>(IDictionary<TKey, TValue> dict, TKey key)
+        {
+            return dict.TryGetValue(key, out var ret) ? ret : default;
+        }
 
         [UsedImplicitly]
         private void Copy()
         {
             if (SirenixEditorGUI.ToolbarButton(EditorIcons.File))
             {
-                Clipboard.Copy(string.Join("\n", from e in steps select e.RenderLink));
+                var sb = new StringBuilder();
+                var incomingCounts = new Dictionary<string, int>();
+                var outGoingCounts = new Dictionary<string, int>();
+                for (var i = steps.Length - 1; i >= 0; i--)
+                {
+                    var link = steps[i];
+                    var toLinkKey = link.to.link;
+                    DictAdd(outGoingCounts, link.from.link, 1);
+                    DictAdd(incomingCounts, toLinkKey, 1);
+                    sb.Insert(0, $"{link.from} -> {link.to}({incomingCounts[toLinkKey]})\n");
+                }
+
+                var kvs = incomingCounts.AsEnumerable().ToList();
+                kvs.Sort((a, b) => AllPortals[a.Key].Sequence - AllPortals[b.Key].Sequence);
+                sb.Insert(0, $"{string.Join("\n", kvs.Select(kv => $"{AllPortals[kv.Key]} x{kv.Value}{(DictGet(outGoingCounts, kv.Key) > 8 ? " *SBUL" : "")}"))}\n\n");
+
+                Clipboard.Copy(sb.ToString());
             }
         }
-
-        [TextArea(10, 10)]
-        public string requirements;
 
         public string[] Sort()
         {
@@ -135,7 +163,6 @@ namespace IngressMaxField
 
             list.Insert(0, firstPortal);
             list.Insert(0, targetPortal);
-            sequence = string.Join("\n", list.Select((t, i) => $"{i + 1}. {t.name}"));
             return list.Select(e => e.link).ToArray();
         }
 
@@ -192,30 +219,6 @@ namespace IngressMaxField
             }
 
             steps = detailedSteps.ToArray();
-
-            var listRequirements = new List<string>();
-            foreach (var kv in outBounds)
-            {
-                if (kv.Value >= 8)
-                {
-                    listRequirements.Add($"{kv.Key.name} needs SBUL");
-                }
-            }
-
-            foreach (var portalLink in portals)
-            {
-                var portal = AllPortals[portalLink];
-                if (requiredKeys.TryGetValue(portal, out var count))
-                {
-                    listRequirements.Add($"Keys for {portal.name} is {count}");
-                }
-                else
-                {
-                    listRequirements.Add($"Keys for {portal.name} is !!!ZERO!!!");
-                }
-            }
-
-            requirements = string.Join("\n", listRequirements);
         }
     }
 
