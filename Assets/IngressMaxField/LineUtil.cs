@@ -9,9 +9,7 @@ namespace IngressMaxField
     {
         public static void Swap<T>(ref T lhs, ref T rhs)
         {
-            T temp = lhs;
-            lhs = rhs;
-            rhs = temp;
+            (lhs, rhs) = (rhs, lhs);
         }
 
         public static bool Approximately(float a, float b, float tolerance = 1e-5f)
