@@ -7,7 +7,7 @@ namespace IngressMaxField
     [Serializable]
     public class Portal
     {
-        private static readonly Regex RegexCoordinates = new Regex(@"https://intel\.ingress\.com/intel\?ll=(?<x>[\d\.\-]+),(?<y>[\d\.\-]+)&z=\d+&pll=([\d\.\-]+),([\d\.\-]+)", RegexOptions.Compiled);
+        private static readonly Regex RegexCoordinates = new Regex(@"https://intel\.ingress\.com/intel\?ll=[\d\.\-]+,[\d\.\-]+&z=\d+&pll=(?<x>[\d\.\-]+),(?<y>[\d\.\-]+)", RegexOptions.Compiled);
         public const double Scale = 100;
 
         public static (double x, double y)? RefPos;
