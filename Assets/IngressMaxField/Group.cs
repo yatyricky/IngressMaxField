@@ -130,7 +130,7 @@ namespace IngressMaxField
                 }
 
                 var kvs = incomingCounts.AsEnumerable().ToList();
-                kvs.Sort((a, b) => AllPortals[a.Key].Sequence - AllPortals[b.Key].Sequence);
+                kvs.Sort((a, b) => Vector3.Distance(AllPortals[a.Key].Position, AllPortals[target].Position) < Vector3.Distance(AllPortals[b.Key].Position, AllPortals[target].Position) ? -1 : 1);
                 sb.Insert(0, $"{string.Join("\n", kvs.Select(kv => $"{AllPortals[kv.Key]} x{kv.Value}{(DictGet(outGoingCounts, kv.Key) > 8 ? " *SBUL" : "")}"))}\n\n");
 
                 Clipboard.Copy(sb.ToString());
